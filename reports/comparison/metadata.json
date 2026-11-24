@@ -1,0 +1,18 @@
+{
+  "input_file": "sample_prices.csv",
+  "sha256": "2749cb69198f82772de44f223a9c741ba7e946a55c74f965988693cc1f4f7a56",
+  "models": [
+    "historical",
+    "ridge",
+    "lstm",
+    "bilstm",
+    "cnn_bilstm"
+  ],
+  "epochs": 12,
+  "versions": {
+    "numpy": "2.5.5",
+    "pandas": "3.1.1",
+    "scipy": "1.18.1",
+    "torch": "2.9.1"
+  }
+}

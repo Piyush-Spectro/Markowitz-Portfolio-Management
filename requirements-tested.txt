@@ -1,0 +1,8 @@
+# Versions used for the checked-in demonstration on Python 3.13 / macOS ARM64.
+# Install the package afterwards: pip install -e '.[dev]'
+numpy==2.5.5
+pandas==3.1.1
+scipy==1.18.1
+matplotlib==3.11.2
+pytest==9.2.0
+# Optional neural demonstration used torch==2.9.1.

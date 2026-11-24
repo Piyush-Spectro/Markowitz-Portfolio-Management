@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markowitz | Research report</title><style>
+body{margin:0;background:#f4f6f8;color:#172b3a;font:16px/1.65 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:56px 24px}
+h1{font-size:42px;line-height:1.12;letter-spacing:-1.4px}h2{margin-top:36px;font-size:22px}.eyebrow{letter-spacing:2px;font-size:12px;color:#267d91;font-weight:700}
+.card{background:white;border:1px solid #dce3e9;border-radius:12px;padding:24px;margin:24px 0}img{width:100%;height:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:12px;text-align:right;border-bottom:1px solid #e2e8f0}th:first-child{text-align:left}.scroll{overflow-x:auto}code{background:#e8eef2;padding:2px 5px}p{max-width:900px}.muted{color:#586777}@media(max-width:600px){main{padding:24px 12px}h1{font-size:32px}.card{padding:14px}}
+</style><main><div class="eyebrow">RESEARCH NOTE / REPRODUCIBLE EXPERIMENT</div><h1>Forecasts are inputs.<br>Portfolio performance is the test.</h1><p>Synthetic demonstration / not market performance. Model: <strong>ridge</strong>.</p><div class="card"><h2>Walk-forward results, after trading costs</h2><div class="scroll"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Total return</th>
+      <th>CAGR</th>
+      <th>Volatility</th>
+      <th>Sharpe</th>
+      <th>Max drawdown</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Equal weight</th>
+      <td>-25.9%</td>
+      <td>-9.5%</td>
+      <td>10.2%</td>
+      <td>-1.12</td>
+      <td>-31.3%</td>
+    </tr>
+    <tr>
+      <th>Minimum variance</th>
+      <td>-11.7%</td>
+      <td>-4.1%</td>
+      <td>8.4%</td>
+      <td>-0.69</td>
+      <td>-21.1%</td>
+    </tr>
+    <tr>
+      <th>Forecast Markowitz</th>
+      <td>-22.2%</td>
+      <td>-8.0%</td>
+      <td>9.8%</td>
+      <td>-1.01</td>
+      <td>-29.5%</td>
+    </tr>
+    <tr>
+      <th>Black-Litterman</th>
+      <td>-21.5%</td>
+      <td>-7.8%</td>
+      <td>9.5%</td>
+      <td>-1.01</td>
+      <td>-28.5%</td>
+    </tr>
+  </tbody>
+</table></div></div><div class="card"><img src="overview.png" alt="Net wealth, drawdown, allocation and training-only efficient frontier"></div><h2>What this run measures</h2><p>Test period: 2020-12-22 to 2023-11-13. Train window: 252 observations. Rebalance interval: 21 observations. Trading cost: 10 basis points per unit bought or sold. Initial investment is charged. Risk-free assumption: 2.0% annually. Forecast RMSE: 0.002019 in daily-return units.</p><p>There were 21 minimum-variance fallbacks where a positive expected excess return was infeasible. All rebalances, costs, forecasts and target weights are included in the adjacent CSV files.</p><h2>Interpretation and limits</h2><p>The forecast estimates a holding-period average return. A good forecast score does not guarantee a better allocation. Concentration, covariance estimates and trading costs can outweigh a small predictive advantage. The frontier is a training-sample illustration, not a forecast of realized performance.</p><p>The included sample is synthetic. Its results establish that the pipeline runs; they do not establish investment skill. For real-market experiments, use point-in-time adjusted prices and document universe selection, missing observations and corporate actions. This implementation assumes daily observations, close-price execution, full investment, no shorting, proportional costs and no taxes or market impact.</p><p class="muted">Source and configuration fingerprints are recorded in metadata.json. Educational research; no investment recommendation.</p></main></html>

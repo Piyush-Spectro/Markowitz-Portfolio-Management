@@ -1,0 +1,12 @@
+{
+  "train_window": 252,
+  "rebalance": 21,
+  "annualization": 252,
+  "risk_free": 0.02,
+  "cost_bps": 10.0,
+  "max_weight": 0.35,
+  "top_k": null,
+  "forecast_method": "cnn_bilstm",
+  "neural_epochs": 12,
+  "seed": 42
+}
