@@ -13,7 +13,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prices", type=Path, default=Path("data/sample_prices.csv"))
     parser.add_argument("--output", type=Path, default=Path("outputs/run"))
-    parser.add_argument("--model", choices=["historical", "ridge", "cnn_bilstm", "lstm", "bilstm"], default="ridge")
+    parser.add_argument("--model", choices=["historical", "ridge", "cnn_bilstm", "rcnn_bilstm", "lstm", "bilstm"], default="ridge")
     parser.add_argument("--train-window", type=int, default=252)
     parser.add_argument("--rebalance", type=int, default=21)
     parser.add_argument("--risk-free", type=float, default=0.02)
@@ -22,15 +22,19 @@ def main(argv=None):
     parser.add_argument("--top-k", type=int)
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--forecast-target", choices=["return", "price"], default="return")
+    parser.add_argument("--allocation", choices=["max_sharpe", "target_return"], default="max_sharpe")
+    parser.add_argument("--target-return", type=float, default=0.08)
     args = parser.parse_args(argv)
     try:
         prices = load_prices(args.prices)
         config = Config(train_window=args.train_window, rebalance=args.rebalance, risk_free=args.risk_free,
                         cost_bps=args.cost_bps, max_weight=args.max_weight, top_k=args.top_k,
-                        forecast_method=args.model, neural_epochs=args.epochs, seed=args.seed)
+                        forecast_method=args.model, neural_epochs=args.epochs, seed=args.seed,
+                        forecast_target=args.forecast_target, allocation=args.allocation, target_return=args.target_return)
         result = run_backtest(prices, config)
         versions = {name: importlib.metadata.version(name) for name in ["numpy", "pandas", "scipy", "matplotlib"]}
-        if args.model in {"cnn_bilstm", "lstm", "bilstm"}:
+        if args.model in {"cnn_bilstm", "rcnn_bilstm", "lstm", "bilstm"}:
             versions["torch"] = importlib.metadata.version("torch")
         metadata = {"data_label": "Synthetic demonstration / not market performance" if all(str(c).startswith("Asset_") for c in prices.columns)
                     else "User-supplied prices / provenance must be verified by the researcher",

@@ -10,3 +10,7 @@ dist/
 .env
 outputs/
 *.pdf
+# Provider observations are downloaded locally, not redistributed.
+data/set50/raw/
+data/set50/adjusted_prices.csv
+data/set50/raw_close.csv

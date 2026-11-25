@@ -1,0 +1,15 @@
+{
+  "train_window": 252,
+  "rebalance": 21,
+  "annualization": 252,
+  "risk_free": 0.02,
+  "cost_bps": 10.0,
+  "max_weight": 0.35,
+  "top_k": 8,
+  "forecast_method": "rcnn_bilstm",
+  "neural_epochs": 20,
+  "seed": 42,
+  "forecast_target": "price",
+  "allocation": "target_return",
+  "target_return": 0.08
+}

@@ -55,7 +55,9 @@ def write_report(result, training_returns, output, metadata):
     metrics = result.metrics.copy()
     for col in metrics:
         metrics[col] = metrics[col].map(lambda value: f"{value:.2f}" if col == "sharpe" else f"{value:.1%}")
-    metrics.columns = ["Total return", "CAGR", "Volatility", "Sharpe", "Max drawdown"]
+    metrics = metrics.rename(columns={"total_return": "Total return", "cagr": "CAGR", "volatility": "Volatility",
+                                     "sharpe": "Sharpe", "max_drawdown": "Max drawdown",
+                                     "mean_daily_return": "Mean daily return", "mean_annual_return": "Mean annual return"})
     error = result.forecasts.predicted_daily_return - result.forecasts.realized_daily_return
     forecast_rmse = float(np.sqrt(np.mean(error ** 2)))
     fallback_count = int(result.trades.min_variance_fallback.sum())
@@ -74,10 +76,13 @@ h1{font-size:42px;line-height:1.12;letter-spacing:-1.4px}h2{margin-top:36px;font
     page += f'Risk-free assumption: {result.config["risk_free"]:.1%} annually. Forecast RMSE: {forecast_rmse:.6f} in daily-return units.</p>'
     page += f'<p>There were {fallback_count} minimum-variance fallbacks where a positive expected excess return was infeasible. '
     page += 'All rebalances, costs, forecasts and target weights are included in the adjacent CSV files.</p>'
-    page += '<h2>Interpretation and limits</h2><p>The forecast estimates a holding-period average return. A good forecast score does not guarantee a better allocation. '
+    page += '<h2>Interpretation and limits</h2><p>The configured forecast is converted into expected returns for allocation. A good forecast score does not guarantee a better allocation. '
     page += 'Concentration, covariance estimates and trading costs can outweigh a small predictive advantage. '
     page += 'The frontier is a training-sample illustration, not a forecast of realized performance.</p>'
-    page += '<p>The included sample is synthetic. Its results establish that the pipeline runs; they do not establish investment skill. '
+    if 'Synthetic' in metadata['data_label']:
+        page += '<p>This run uses synthetic data and does not establish investment skill. '
+    else:
+        page += '<p>This run uses supplied historical prices. Coverage, corporate actions and universe selection affect interpretation. '
     page += 'For real-market experiments, use point-in-time adjusted prices and document universe selection, missing observations and corporate actions. '
     page += 'This implementation assumes daily observations, close-price execution, full investment, no shorting, proportional costs and no taxes or market impact.</p>'
     page += '<p class="muted">Source and configuration fingerprints are recorded in metadata.json. Educational research; no investment recommendation.</p></main></html>'

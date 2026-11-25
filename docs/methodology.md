@@ -1,95 +1,101 @@
-# Methodology
+# Methodology: price forecasts to constrained portfolios
 
-## Research design
+## Scope and dates
 
-The experiment asks whether forecast-driven allocations add value over simple portfolio rules. Every strategy uses the same out-of-sample dates, risk-free assumption, and transaction-cost convention. All model fitting and stock ranking occur within each rolling training window.
+The primary experiment uses real prices for 41 downloadable members of the January 2015 SET50 cohort. It covers January 2015–December 2020 inclusive. Those endpoints span six calendar years; the proposal's wording “five years (2015–2020)” is internally ambiguous. The first 252 observations are used for initial model training, leaving roughly five years for walk-forward evaluation.
 
-The implementation is an independent research exercise. It is not a reproduction of a specific paper: the original historical universe, corporate-action series, and experimental configuration are not supplied. The reference learning material informed the topics; its files are not distributed here.
+[Data provenance](../data/set50/README.md) documents all 50 requested members, symbol mappings, nine exclusions, the cleaning policy and source hashes. This is a fixed-cohort study, not an index replication. Availability bias and revised corporate-action adjustments remain limitations; the report does not present the universe as survivorship-free.
 
-## Returns and estimation
+## Price target and normalization
 
-For adjusted price P, daily simple return is `r[t] = P[t] / P[t-1] - 1`. Arithmetic mean returns and covariance are annualized by 252. CAGR is calculated separately from compounded realized returns; it is not interchangeable with an annualized arithmetic mean.
-
-The covariance estimator blends the sample covariance with its diagonal:
-
-`Sigma = 0.85 × sample_cov + 0.15 × diagonal(sample_cov)`
-
-A diagonal floor of `1e-10` ensures positive definiteness for constant or duplicated price series. The shrinkage coefficient is fixed in advance, not selected on the test set. This simple estimator is intentionally transparent; it is not Ledoit–Wolf estimated shrinkage.
-
-## Forecasts
-
-Each forecast estimates the mean daily return over the next holding-period horizon. A 20-observation lookback forms the input window; targets average the following 21 observations by default. Only targets entirely contained in the training window are available for fitting.
-
-| Model | Implementation | Main tradeoff |
-| --- | --- | --- |
-| Historical mean | Mean of the rolling training returns | Stable baseline, slow to adapt |
-| Ridge | Flattened multivariate return window; L2 penalty 100 | Cheap and inspectable, limited nonlinear structure |
-| LSTM | One 16-unit recurrent layer | Learns temporal features with relatively few parameters |
-| BiLSTM | One bidirectional 16-unit recurrent layer | Reads both directions inside an already observed window |
-| CNN–BiLSTM | 16-channel 1D convolution, ReLU, bidirectional LSTM, linear output | Adds local temporal feature extraction at greater complexity |
-
-The neural network is a compact CNN–BiLSTM implementation, not a claim to reproduce the ambiguously named R-CNN architecture in the proposal. Ridge is the default because it is a useful low-cost baseline.
-
-For ridge, feature scaling and the intercept are learned within the training sample. Neural validation uses the final 20% of available windows. Training windows whose target dates overlap the validation targets are purged. Normalization uses only the neural training partition. Adam trains for a fixed maximum epoch count, and the lowest validation-loss weights are restored. There is no test-set early stopping.
-
-Bidirectionality does not grant access to future market observations: both directions operate within the historical input window. Models retrain from scratch at each rebalance. Fixed seeds support reproducibility; they do not establish robustness across seeds.
-
-## Allocation
-
-Portfolios satisfy `sum(w) = 1` and `0 <= w[i] <= cap`. Optional top-k selection ranks forecasts within the training window. Equal weight retains the full input universe as an independent benchmark; minimum variance and both forecast-driven strategies use the selected universe. This means a top-k experiment changes both selection and allocation relative to equal weight.
-
-Minimum variance minimizes `w.T @ Sigma @ w`. The efficient frontier solves that problem for a sequence of minimum expected-return constraints, starting at the global minimum-variance portfolio. The upper endpoint is the maximum feasible return under the position cap, not simply the highest asset mean.
-
-Maximum Sharpe maximizes `(mu.T @ w - rf) / sqrt(w.T @ Sigma @ w)`. For positive excess returns, the solver uses the equivalent convex formulation: minimize `y.T @ Sigma @ y` subject to `(mu - rf).T @ y = 1`, nonnegative `y`, and linear transformed caps `y[i] <= cap × sum(y)`. It then recovers `w = y / sum(y)`. Scaling the objective and excess-return constraint improves numerical conditioning. If no feasible portfolio has a positive expected excess return, the backtest uses minimum variance and logs the fallback. Other solver failures stop the run. Solver success, budget, bounds, and target feasibility are checked; failed solutions are never silently normalized and accepted.
-
-## Bayesian views
-
-Black–Litterman combines an explicit prior with uncertain views. All means, views, and covariances use annual units. With equal-weight reference allocation `w_ref`, risk aversion `delta = 2.5`, and `tau = 0.05`:
+For anchor date `a`, lookback `L = 20`, holding horizon `H = 21`, and execution delay `D = 1`:
 
 ```text
-pi = delta × Sigma × w_ref                    # prior excess mean
-C = tau × Sigma                              # prior mean uncertainty
-q = annualized forecast - risk_free          # absolute excess-return views
-P = identity                                 # one view for each selected asset
-Omega = diagonal(P × C × P.T)                 # fixed view-uncertainty heuristic
-K = C × P.T × inverse(P × C × P.T + Omega)
-posterior_mean = pi + K × (q - P × pi)
-posterior_mean_cov = C - K × P × C
-predictive_cov = Sigma + posterior_mean_cov
+X[a] = log(P[a-L+1:a+1] / P[a])
+y[a] = log(P[a+H+D] / P[a])
+predicted_price[a+H+D] = P[a] * exp(predicted_y[a])
+predicted_horizon_return = predicted_price / P[a] - 1
 ```
 
-The implementation uses linear solves instead of explicitly inverting matrices. The risk-free rate is added back before maximum-Sharpe optimization. The API also accepts relative views and a user-specified positive-definite Omega.
+`P` denotes provider-adjusted closing prices. Predictions are terminal adjusted price levels, not a claim to forecast contemporaneous raw transaction prices. Relative log-price inputs avoid letting the absolute price scale of one stock dominate the network. Feature and target standardization are fitted only on the neural training partition; predicted targets are transformed back into adjusted prices.
 
-Equal-weight reference returns are a modeling assumption, not market-implied equilibrium evidence. The default Omega is a heuristic rather than calibrated forecast uncertainty. When Omega scales with tau this way, changing tau does not change the posterior mean; it still changes the predictive covariance. The posterior uncertainty should not be interpreted as a calibrated confidence interval for realized investment returns.
+Targets include the one-bar execution delay. A signal observed at close `a` is executed at close `a+1` and held through close `a+22`. Asset rankings use predicted returns relative to the known anchor price, never the future execution price. Expected returns are converted to annual arithmetic approximations using `predicted_horizon_return * 252 / 22` for mean-variance optimization. This approximation is an assumption, not a calibrated expected-return model.
 
-## Walk-forward timing
+## Models
 
-For a test return at index `t`:
+All three proposal models are trained and evaluated on identical rolling windows:
 
-1. Fit and select assets using returns ending at `t-2`.
-2. Execute target weights at the close of `t-1`.
-3. Earn the close-to-close return indexed `t`.
-4. Keep positions until the next rebalance, updating weights as prices move.
+- **LSTM:** one 16-unit recurrent layer and a linear multi-asset output head.
+- **BiLSTM:** one bidirectional recurrent layer with 16 units per direction and a linear head.
+- **R-CNN–BiLSTM:** a recurrent convolution block followed by the same BiLSTM and linear head.
 
-That extra bar is deliberate: a strategy should not trade at the very close needed to compute its signal. Training targets refer to the next holding period after the observed window, while execution shifts the realized holding period one bar later. Forecast errors therefore measure the actionable, delayed forecast rather than a frictionless next-bar estimate.
+The recurrent convolution is explicitly defined by:
 
-Costs equal `cost_bps / 10000 × sum(abs(target - pretrade_weights))`. This is gross traded notional, not the half-L1 convention sometimes called one-way turnover. Initial investment has gross notional 1; a complete rotation can approach 2. Fees reduce wealth before the next return: `(1 - fee) × (1 + gross_return) - 1`. Weight drift uses asset returns, while proportional fees reduce the portfolio value uniformly. There is no terminal liquidation charge.
+```text
+drive = Conv1D_input(X)
+h_0 = ReLU(drive)
+h_j = ReLU(drive + Conv1D_recurrent(h_(j-1))), j = 1, 2, 3
+features = transpose(h_3)
+output = Linear(concat(final_forward_state, final_backward_state))
+```
 
-## Metrics and reproducibility
+Both convolutions use kernel width 3 and 16 output channels. The recurrent convolution **reuses its weights** over the three refinements. It is not merely the earlier feed-forward CNN renamed. The convolution operates over temporal patterns in multivariate stock sequences; no arbitrary stock-order spatial neighborhood is assumed. Bidirectionality is confined to an already observed historical input window.
 
-The report includes total return, CAGR, annualized sample volatility, daily-excess-return Sharpe, and maximum drawdown measured from initial capital. A zero-volatility Sharpe is undefined and reported as missing. Forecast RMSE averages errors across assets and rebalance blocks. The final short block is retained and identified by its `holding_days`; it has equal weight in the headline forecast error despite its shorter horizon.
+The proposal does not provide a paper, kernel specification or exact layer dimensions. This is a documented implementation of its recurrent-convolution/BiLSTM design, not a claim of exact reproduction of an unidentified architecture.
 
-Each run exports input SHA-256, asset names, library versions, configuration, daily net returns, target weights, trades, forecasts, and summary metrics. The initial frontier uses only the first training window and is shown for the full universe. It does not represent later selected subsets or realized test returns.
+Each model uses Adam (learning rate 0.003, weight decay 0.001), gradient norm clipping at 1, a maximum of 20 epochs and seed 42 on CPU. The final 20% of available training windows form chronological validation. A 22-window purge separates training targets from validation anchors. Normalization uses the retained training partition only, and the best validation-loss checkpoint is restored. Test returns do not affect normalization, early stopping, ranking or optimization.
 
-## Limits and next experiments
+The latest checkpoint for each model is saved with architecture, asset order, normalization parameters, decision date and input hash. These checkpoints can be reloaded with `torch.load(..., weights_only=True)` and `predict_from_checkpoint`.
 
-No model is assumed to outperform. Evaluate multiple market regimes and seeds, tune hyperparameters only in nested chronological validation, and compare forecasts with zero-return and historical-mean baselines. Use a point-in-time universe to avoid survivorship bias. Daily adjusted prices should be consistently defined, with splits and dividends handled by the data provider. The loader rejects missing entries; selecting only complete series can itself bias the universe and must be documented.
+## Stock selection and allocation
 
-The execution model omits bid–ask spreads beyond the proportional fee, nonlinear market impact, taxes, borrow costs, and capacity constraints. Gaussian mean–variance assumptions do not adequately describe tail losses. This project does not include live trading, brokerage credentials, or automated recommendations.
+At each rebalance, rank all 41 stocks by predicted horizon return and select the top **5, 6, 7, 8, 9 or 10**. All six sizes are evaluated separately for all three neural models: **18 model/size experiments**. The exact same forecasts are cached and reused across sizes. Selected-universe size need not equal the number of nonzero optimized holdings.
+
+Portfolios are long-only and fully invested, with a 35% maximum weight per asset. The primary proposal strategy solves:
+
+```text
+minimize       w.T @ Sigma @ w
+subject to     sum(w) = 1
+               0 <= w[i] <= 0.35
+               mu.T @ w >= target_return
+```
+
+The requested annual expected-return target is **8%**, fixed before evaluation. If it exceeds the maximum feasible expected return under the cap, the effective target is lowered to that ceiling (less a numerical tolerance). Requested target, effective target, clipping flag and achieved expected return are written to every trade log. An infeasible 8% target is never reported as achieved.
+
+Comparators are the equal-weight full-cohort portfolio, selected-universe global minimum variance, and a Black–Litterman target-return portfolio. The risk-free assumption is a constant 2% annually; it is not represented as a measured Thai risk-free-rate series.
+
+Daily simple returns determine covariance. The estimate blends 85% sample covariance and 15% its diagonal, annualized by 252, plus a `1e-10` diagonal floor. Optimization uses SLSQP with budget/bound/return-feasibility checks. The optional maximum-Sharpe mode remains available for exploratory runs; it is not the primary proposal experiment.
+
+## Bayesian extension
+
+Black–Litterman remains an additional analysis beyond the proposal's minimum requirements. With equal-weight reference allocation, `delta = 2.5` and `tau = 0.05`, the prior excess mean is `pi = delta * Sigma @ w_ref`. Price-derived annual excess returns form absolute views. `Omega` is the diagonal of `tau * Sigma`; the predictive covariance includes posterior mean uncertainty. Linear solves compute the update.
+
+This is a reference-allocation prior, not a market-cap-weighted prior. View uncertainty is a fixed heuristic, not an estimated prediction interval. The identical target-return policy is applied to the resulting posterior means and covariance.
+
+## Execution and performance
+
+Holdings drift with asset returns between rebalances. Trading fees are 10 basis points times gross bought-plus-sold notional, including the initial investment. Fees reduce wealth before the first return after a rebalance. There is no terminal liquidation fee, market-impact model or tax calculation.
+
+Portfolio outputs include:
+
+- Arithmetic mean daily return and annualized arithmetic mean return.
+- Annualized sample volatility and daily-excess-return Sharpe ratio.
+- Total compounded return, CAGR and maximum drawdown from initial capital.
+- Turnover and infeasible-target counts.
+
+Price-forecast outputs include RMSE and MAE in adjusted THB units, MAPE, direction accuracy and a no-change-price baseline. Forecast evaluation excludes the final incomplete holding period; portfolio performance includes its realized returns. MAPE gives a scale-comparable view alongside price errors that can otherwise be dominated by high-priced stocks.
+
+## Limitations
+
+The goal of high return and low risk is a research hypothesis, not a guaranteed result. A single historical period, one seed, a coverage-filtered cohort and fixed hyperparameters cannot establish a deployable investment strategy. Missing delisted histories, current-vintage adjustments, stale quotes, estimated execution prices and omitted capacity costs limit external validity. A stronger follow-up would use licensed point-in-time constituent/security histories, multiple seeds and nested chronological model tuning.
+
+The original synthetic example remains an offline software smoke test; its outputs are clearly separated under `reports/demo` and `reports/comparison`.
 
 ## References
 
-- Markowitz, H. (1952), *Portfolio Selection*, Journal of Finance, 7(1), 77–91. [DOI](https://doi.org/10.1111/j.1540-6261.1952.tb01525.x).
-- [MathWorks: Black–Litterman portfolio optimization](https://www.mathworks.com/help/finance/black-litterman-portfolio-optimization.html), for the linear-Gaussian update and the distinction between views and prior information.
-- [SciPy: SLSQP](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html), for the constrained numerical solver.
-- [PyTorch: LSTM](https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html), for recurrent-layer conventions and bidirectional hidden states.
+- Markowitz, H. (1952), *Portfolio Selection*, [DOI](https://doi.org/10.1111/j.1540-6261.1952.tb01525.x).
+- [SET's December 2014 constituent announcement](https://ptg.listedcompany.com/misc/SET100-50.pdf).
+- [Yahoo Finance historical-data fields](https://finance.yahoo.com/quote/ADVANC.BK/history/).
+- [SciPy SLSQP documentation](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html).
+- [PyTorch LSTM documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html).
+- [Black–Litterman update derivation](https://www.mathworks.com/help/finance/black-litterman-portfolio-optimization.html).

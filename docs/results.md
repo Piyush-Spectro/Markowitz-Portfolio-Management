@@ -1,70 +1,76 @@
-# Experiment results
+# SET50 study: measured results
 
-## Summary
+## Scope
 
-This is a completed software experiment on an artificial dataset, not evidence of a tradable strategy. The sample contains eight fictional assets generated from shared factors and independent noise. All results below are measured outputs from the repository code.
+The primary study uses real Yahoo Finance adjusted prices for **41 stocks** from the January 2015 SET50 cohort. The panel contains **1,462 observations**, from **2015-01-05 to 2020-12-30**. The first 252 returns are training history; evaluation begins 2016-01-18 and ends 2020-12-30.
 
-The useful finding in this demonstration is that greater model complexity did not automatically improve allocation. Minimum variance had the smallest loss and drawdown in the default comparison. Every strategy lost money over this particular sample path. The seed was not changed to produce a more attractive chart.
+All **18 combinations** of LSTM, BiLSTM and R-CNN–BiLSTM with top 5, 6, 7, 8, 9 and 10 stocks were run. The primary strategy minimizes variance subject to an 8% annual expected-return target, a 35% position cap and full investment. Infeasible targets are lowered and logged; realized returns are not guaranteed to reach the requested target.
 
-## Default allocation comparison
+The historical list contained 50 stocks. Eight histories were unavailable and BANPU had insufficient early coverage. The resulting fixed coverage subset is not a survivorship-free reconstruction of the changing SET50 index. [Coverage and source audit](../data/set50/README.md).
 
-Test observations: 755; dates: 2020-12-22 to 2023-11-13. Training window: 252 observations; rebalance interval: 21; cost: 10 bps per unit traded; position cap: 35%; risk-free assumption: 2% annually.
+![Real-data experiment overview](../reports/set50/overview.png)
 
-| Strategy | Total return | CAGR | Volatility | Sharpe | Max drawdown |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Equal weight | -25.93% | -9.53% | 10.25% | -1.120 | -31.27% |
-| Minimum variance | -11.71% | -4.07% | 8.44% | -0.685 | -21.07% |
-| Forecast Markowitz | -22.23% | -8.05% | 9.75% | -1.015 | -29.53% |
-| Black-Litterman | -21.52% | -7.77% | 9.50% | -1.012 | -28.50% |
+## Top-10 target-return portfolios
 
-The expected-return estimates matter, but so do the constraints. When no feasible allocation has a positive estimated excess return, the optimizer falls back to minimum variance and records that event. The headline returns include those decisions, rather than excluding difficult periods.
+These figures are net of 10 bps per unit bought or sold, including initial investment. The risk-free assumption is 2% annually. Arithmetic annual mean and CAGR are intentionally reported separately.
 
-## Forecasting comparison
+| Model | Total return | Annual mean | CAGR | Volatility | Sharpe | Max drawdown | Lowered targets |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LSTM | 46.94% | 9.61% | 8.36% | 17.75% | 0.430 | -39.08% | 2/58 |
+| BiLSTM | 42.81% | 9.09% | 7.72% | 18.15% | 0.392 | -38.61% | 3/58 |
+| R-CNN–BiLSTM | 17.26% | 4.75% | 3.38% | 16.85% | 0.165 | -39.50% | 1/58 |
 
-Each model used the same dataset, training window, execution delay and fee schedule. Neural models trained for at most 12 epochs per rebalance, with purged chronological validation. These settings were not tuned against the reported test period.
+The full-cohort equal-weight benchmark returned **35.46%**, with Sharpe **0.337** and maximum drawdown **-44.62%**. This is a portfolio of the included stocks, not the official SET50 total-return index.
 
-| Forecast model | Daily-return RMSE | Forecast Markowitz total return | Black–Litterman total return |
+## All portfolio sizes
+
+Annualized Sharpe ratios for the forecast-based target-return portfolios:
+
+| Selected stocks | LSTM | BiLSTM | R-CNN–BiLSTM |
 | --- | ---: | ---: | ---: |
-| historical | 0.001943 | -22.11% | -19.68% |
-| ridge | 0.002019 | -22.23% | -21.52% |
-| lstm | 0.002004 | -13.52% | -15.82% |
-| bilstm | 0.002016 | -20.16% | -16.34% |
-| cnn_bilstm | 0.002006 | -16.55% | -15.42% |
+| 5 | 0.566 | 0.654 | 0.597 |
+| 6 | 0.431 | 0.500 | 0.406 |
+| 7 | 0.514 | 0.459 | 0.219 |
+| 8 | 0.430 | 0.455 | 0.239 |
+| 9 | 0.533 | 0.427 | 0.183 |
+| 10 | 0.430 | 0.392 | 0.165 |
 
-A zero-return forecast has RMSE 0.001959 on the same realized blocks. All neural models and ridge had higher forecast error than this baseline in the sample. LSTM produced the smallest loss among the forecast-driven Markowitz variants, but that does not establish statistical significance or outperformance in another market.
+## Price prediction
 
-## Cost sensitivity
+Errors use complete forecast horizons only. Price MAE/RMSE use provider-adjusted THB levels; MAPE compares relative accuracy across stocks. The no-change baseline predicts the last observed adjusted price. The ADVANC chart is a fixed alphabetical example, not the stock chosen for the best forecast fit.
 
-These runs change only transaction costs, holding the ridge forecast, position cap and full universe fixed. Costs apply to buys and sells separately through gross traded notional.
+| Model | Price MAE | Price RMSE | MAPE | Direction accuracy |
+| --- | ---: | ---: | ---: | ---: |
+| LSTM | 2.685 | 5.224 | 6.43% | 50.36% |
+| BiLSTM | 2.734 | 5.318 | 6.53% | 50.06% |
+| R-CNN–BiLSTM | 2.710 | 5.250 | 6.53% | 49.51% |
 
-| Cost per unit traded | Forecast Markowitz total return | Black–Litterman total return |
-| --- | ---: | ---: |
-| 0 bps | -19.32% | -18.82% |
-| 10 bps | -22.23% | -21.52% |
-| 25 bps | -26.40% | -25.42% |
-| 50 bps | -32.87% | -31.49% |
+No-change-price baseline MAPE: **6.07%**. Each model was scored on **2,337** asset/horizon predictions.
 
-The same sensitivity file includes top-k selections of five through eight assets. These are diagnostic comparisons, not a recommendation to select whichever setting has the best test return. Position caps, selected-universe risk and turnover should be considered together.
+## Interpretation
 
-## Reproduce and inspect
+All three neural models had higher MAPE than the no-change-price baseline in this run. The top-10 hybrid portfolio also had a lower Sharpe ratio than either recurrent baseline. These results do not support a claim that the hybrid is superior.
+
+A low price error does not by itself establish profitable stock selection. The ranking step, covariance estimate, target feasibility, weight cap and trading costs all affect realized portfolio outcomes. Compare model results with the simple benchmark and the no-change forecast rather than assuming that the hybrid must perform best.
+
+These are descriptive results from one historical interval and one seed, not significance tests. No model or portfolio size is designated a winner for live investment. Future work should use licensed point-in-time constituent and delisting records, multiple seeds, transaction-cost stress tests, and nested chronological tuning.
+
+## Reproduce
 
 ```bash
-markowitz --output reports/demo
-python scripts/compare_models.py --neural --output reports/comparison
-python scripts/sensitivity.py --output reports/sensitivity
+pip install -e '.[dev,neural]'
+python scripts/download_set50.py
+python scripts/run_set50_study.py
+python scripts/report_set50.py
 python scripts/execute_notebook.py
+pytest -q
 ```
 
-Install the `dev` and `neural` extras first. The reports record library versions and the input fingerprint. Each model comparison also includes its own daily returns, target weights, forecast records and trade log. The tested direct dependency versions are in `requirements-tested.txt`; neural runs used PyTorch 2.9.1 on CPU.
+Raw provider responses and cleaned price panels stay local. Source hashes, all configurations, derived forecasts, trade logs, allocations, metrics and latest model checkpoints are included. Neither supplied PDF is included.
 
-- [Default metrics](../reports/demo/metrics.csv)
-- [Model comparison](../reports/comparison/model_comparison.csv)
-- [Cost and top-k sensitivity](../reports/sensitivity/sensitivity.csv)
-- [Run metadata](../reports/demo/metadata.json)
-- [Notebook](../notebooks/portfolio_research.ipynb)
-
-## What this does not establish
-
-The experiment does not validate performance on SET50 or another real-market universe. The artificial returns do not reproduce market microstructure, sector changes, corporate actions or delistings. One synthetic path and one seed cannot support an investment claim.
-
-A next empirical study should use documented point-in-time data, compare multiple non-overlapping periods, run multiple training seeds, tune only inside nested chronological validation, and report uncertainty around performance differences. Training on prices or adding more layers would not by itself resolve those limitations.
+- [Portfolio metrics for every combination](../reports/set50/portfolio_metrics.csv)
+- [Price-prediction metrics](../reports/set50/price_metrics.csv)
+- [Run metadata](../reports/set50/metadata.json)
+- [R-CNN–BiLSTM price forecasts](../reports/set50/rcnn_bilstm/price_forecasts.csv)
+- [Executed notebook](../notebooks/portfolio_research.ipynb)
+- [Methodology and assumptions](methodology.md)

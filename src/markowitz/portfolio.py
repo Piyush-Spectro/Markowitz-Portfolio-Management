@@ -35,17 +35,22 @@ def optimize(mu, cov, objective="min_variance", risk_free=0.02, max_weight=1.0, 
     if not np.isfinite(risk_free):
         raise ValueError("Risk-free rate must be finite.")
     bounds = [(0, max_weight)] * n
-    constraints = [{"type": "eq", "fun": lambda w: w.sum() - 1}]
+    constraints = [{"type": "eq", "fun": lambda w: w.sum() - 1, "jac": lambda w: np.ones(n)}]
+    initial = np.full(n, 1 / n)
     if target is not None:
         if not np.isfinite(target):
             raise ValueError("Target must be finite.")
         feasible = linprog(-mu, A_eq=[np.ones(n)], b_eq=[1], bounds=bounds, method="highs")
         if not feasible.success or target > mu @ feasible.x + 1e-9:
             raise ValueError("Target return is infeasible under the weight cap.")
-        constraints.append({"type": "ineq", "fun": lambda w: mu @ w - target})
+        return_scale = max(float(np.abs(mu).max()), 1e-8)
+        constraints.append({"type": "ineq", "fun": lambda w: (mu @ w - target) / return_scale,
+                            "jac": lambda w: mu / return_scale})
+        if mu @ initial < target:
+            initial = feasible.x
     scaled_cov = cov / max(float(np.diag(cov).mean()), 1e-12)
     if objective == "min_variance":
-        fit = minimize(lambda w: w @ scaled_cov @ w, np.full(n, 1 / n),
+        fit = minimize(lambda w: w @ scaled_cov @ w, initial,
                        jac=lambda w: 2 * scaled_cov @ w, method="SLSQP", bounds=bounds,
                        constraints=constraints, options={"ftol": 1e-11, "maxiter": 1000})
         w = fit.x

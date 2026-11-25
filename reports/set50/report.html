@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SET50 | Portfolio research</title><style>
+body{margin:0;background:#f4f6f8;color:#172b3a;font:16px/1.6 system-ui}main{max-width:1120px;margin:auto;padding:48px 24px}h1{font-size:40px;line-height:1.15}h2{font-size:24px}img{width:100%}.card{background:white;border:1px solid #dce3e9;border-radius:12px;padding:22px;margin:24px 0}.scroll{overflow:auto}table{border-collapse:collapse;font-size:13px;width:100%}th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:right}.muted{color:#576777}a{color:#267d91}</style><main>
+<p class="muted">REAL-PRICE RESEARCH / SET50 HISTORICAL COHORT</p><h1>Price forecasts.<br>Constrained portfolios.<br>Measured outcomes.</h1>
+<p>41 stocks from the January 2015 SET50 cohort, 2015–2020 prices, three neural architectures and six portfolio sizes. Nine names were excluded for unavailable or incomplete history. This is a fixed coverage subset, not an index replication.</p>
+<div class="card"><img src="overview.png" alt="Real-data wealth, Sharpe sensitivity, price prediction errors and ADVANC forecasts"></div><div class="card"><h2>Top-10 target-return portfolios</h2><div class="scroll"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>model</th>
+      <th>total_return</th>
+      <th>mean_annual_return</th>
+      <th>volatility</th>
+      <th>sharpe</th>
+      <th>max_drawdown</th>
+      <th>target_clipped_count</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>lstm</td>
+      <td>46.94%</td>
+      <td>9.61%</td>
+      <td>17.75%</td>
+      <td>0.430</td>
+      <td>-39.08%</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>bilstm</td>
+      <td>42.81%</td>
+      <td>9.09%</td>
+      <td>18.15%</td>
+      <td>0.392</td>
+      <td>-38.61%</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <td>rcnn_bilstm</td>
+      <td>17.26%</td>
+      <td>4.75%</td>
+      <td>16.85%</td>
+      <td>0.165</td>
+      <td>-39.50%</td>
+      <td>1</td>
+    </tr>
+  </tbody>
+</table></div></div><p>Requested expected-return target: 8% annually; weight cap: 35%; trading costs: 10 bps per unit traded. Unattainable targets are lowered and recorded, not claimed as achieved.</p><p>The study has availability bias, a fixed initial cohort, one seed and current-vintage price adjustments. Its results do not establish a live investment edge.</p><p><a href="../../docs/results.md">Full results note</a> · <a href="portfolio_metrics.csv">All portfolio metrics</a> · <a href="price_metrics.csv">Forecast metrics</a> · <a href="metadata.json">Run metadata</a></p></main></html>
